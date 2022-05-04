@@ -1,0 +1,517 @@
+---
+title: "Skew-T & Group-T Copula"
+author: "I-Lun Tu"
+date: "4/26/2022"
+output:
+  slidy_presentation: default
+  df_print: kable
+  beamer_presentation: null
+  ioslides_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(sn)
+library(MASS)
+library(ghyp)
+library(astsa)
+library(tidyverse)
+library(EnvStats)
+library(numDeriv)
+library(signal)
+library(mnormt)
+library(sn)
+library(MASS)
+library(ghyp)
+library(knitr)
+```
+
+## Content
+- Research Motivation and Possible Contribution
+- Skew-T Copula and Group-T Copula
+- Copula Estimation Process
+- Application to Financial Data
+- Unconditional Coverage of VaR
+- Possible Improvement
+
+## Research Motivation and Possible Contribution
+- Straightforward way to generalize copula to higher dimensions
+  - More parsimonious model than Vine based Copula
+  - Easier Interpretation - shape, dispersion, and skewness
+  - Bivariate Student-T is effective for pairs of stocks
+
+- Captures stylized facts of financial markets
+  - Asymptotic tail dependence
+  - Asymmetry - joint lower-tailed events
+
+- Empirical results to support skew-T Copula in market risk
+  - One-stage estimation usually does not select skew-T over standard T
+  - Modern unconditional tests for tail risk model
+  - High computational costs and accuracy of skewness parameter
+
+## Skew-T Copula and Group-T Copula
+- Skew-T Distribution:
+$$X=\mathbf{\gamma} V^{-1} + V^{-\frac{1}{2}}\mathbf{Z}$$
+where $V$ is $G(\frac{\nu}{2},\frac{\nu}{2})$, $\mathbf{\gamma}$ is skewness parameter vector.
+  - General Hyperbolic Distribution - Normal mean-variance mixture distribution
+  - When $\gamma=0$, it reduces to Student-T distribution
+  - When $\nu\to\infty$, it becomes Normal distribution (not skew Normal)
+  - $\nu>4$ to have finite covariance - difficulty in application
+
+- Skew-T Copula:
+$$C^{t}_{\nu, P, \gamma}$$
+where $P$ is the correlation matrix.
+  - Same copula for different dispersion and location  
+  - Different $\nu,\gamma$ to form skew and group copula (generalized T) 
+
+## Skew-T Copula and Group-T Copula
+```{r,echo=F,fig.width=7,out.width = '80%',fig.align='center'}
+## Data Generation
+set.seed(5)
+sigma_1<- var(matrix(rt(120,df=5),ncol=2))
+sigma_2<- matrix(c(1,0.6,0.6,1),nrow = 2)
+
+generation<- ghyp(lambda = -0.5*5,chi = 5,psi = 0,mu=c(0,0),sigma = sigma_2,gamma = c(-0.8,0.8),alpha.bar = 0)
+skew_t<- rghyp(10000,object = generation)
+
+## Plotting Copula
+marginal_1<- ghyp(lambda = -0.5*5,chi = 5,psi = 0,mu=0,sigma = 1,gamma = -0.8,alpha.bar = 0)
+marginal_2<- ghyp(lambda = -0.5*5,chi = 5,psi = 0,mu=0,sigma = 1,gamma = 0.8,alpha.bar = 0)
+copula_1<- pghyp(skew_t[,1],object = marginal_1)
+copula_2<- pghyp(skew_t[,2],object = marginal_2)
+plot(copula_1,copula_2,pch=1, xlab="", ylab="",main="Different Skewness")
+```
+
+## Copula Estimation Process
+- Two Stage Estimation:
+  - Forming pseudo observations from the copula
+    - Parametric estimation
+    - Non-parametric estimation (empirical distribution function)
+  - Maximum likelihood estimation for the copula parameters
+
+- Difficulty:
+  - When maximizing copula density, marginal quantile functions have to be calculated $n*d$ times
+    - No close form quantile function for univariate skew-T
+    - Empirical quantile functions has to be simulated for a large number
+  - Positive semi-definiteness of the correlation matrix is not guaranteed
+    - Empirical correlation using Kendall's tau might not work
+- Recent Advancement (Toshinao Yoshiba 2018):
+  - Monotone interpolator (100 interpolating quantiles)  
+  - Reparameterize the Cholesky decomposed triangular matrix with trigonometric functions
+
+## Application to Financial Data
+- Establish VaR for stock portfolio on financial institution
+  - Consumer finance, commercial banking, brokerage and investment management
+  - Dependence modelling for 15 stocks (5 each) equal weight portfolio
+  - Simulate VaR to set up threshold for loss distribution
+  - Measure the dependence structure
+
+## Application to Financial Data
+### Copula Estimation Process
+  - Data Preprocess: unfiltered 5 years weekly log-returns for stocks (serial uncorrelated)
+  
+  - Pseudo copula observations: nonparametric estimation 
+    $\frac{1}{n+1}\sum_{t = 1}^{n}I_{(X_{t,i<=x})}$ (McNeil 2015)
+    
+  - Copula estimation: use the recently proposed method to estimate $\nu,\gamma,P$ (equal-skewness)
+  
+## Application to Financial Data
+### Pseudo Copula
+
+```{r,echo=FALSE}
+# Empirical
+## Data
+Banking_1<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Banking\\Bac.csv")
+Banking_2<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Banking\\C.csv")
+Banking_3<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Banking\\PNC.csv")
+Banking_4<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Banking\\USB.csv")
+Banking_5<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Banking\\WFC.csv")
+
+Brokerage_1<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Brokerage & Investment\\BLK.csv")
+Brokerage_2<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Brokerage & Investment\\ICE.csv")
+Brokerage_3<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Brokerage & Investment\\MS.csv")
+Brokerage_4<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Brokerage & Investment\\SCHW.csv")
+Brokerage_5<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Brokerage & Investment\\SPGI.csv")
+
+Consumer_1<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Consumer Finance\\AXP.csv")
+Consumer_2<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Consumer Finance\\INTU.csv")
+Consumer_3<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Consumer Finance\\MA.csv")
+Consumer_4<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Consumer Finance\\COF.csv")
+Consumer_5<- read.csv("C:\\Users\\absur\\Desktop\\Pis\\[2] UIUC\\[1] Courses\\[3] Spring 2022\\Math 563\\Project\\Data\\Consumer Finance\\V.csv")
+
+Banking<- cbind(Banking_1[,5],Banking_2[,5],Banking_3[,5],Banking_4[,5],Banking_5[,5])
+Brokerage<-cbind(Brokerage_1[,5],Brokerage_2[,5],Brokerage_3[,5],Brokerage_4[,5],Brokerage_5[,5])
+Consumer<-cbind(Consumer_1[,5],Consumer_2[,5],Consumer_3[,5],Consumer_4[,5],Consumer_5[,5])
+
+
+Banking_log_return<-matrix(0,ncol = 5,nrow = nrow(Banking_1)-1)
+Brokerage_log_return<-matrix(0,ncol = 5,nrow = nrow(Banking_1)-1)
+Consumer_log_return<-matrix(0,ncol = 5,nrow = nrow(Banking_1)-1)
+
+for (i in 1:5){
+  Banking_log_return[,i]<-diff(log(Banking[,i]))
+  Brokerage_log_return[,i]<-diff(log(Brokerage[,i]))
+  Consumer_log_return[,i]<-diff(log(Consumer[,i]))
+}
+
+Data_log_return<- cbind(Banking_log_return,Brokerage_log_return,Consumer_log_return)
+
+### Non-parametric
+edf<-function(x,obs){
+  n<-length(obs)
+  
+  indicator<- 0
+  for (i in 1:n){
+    if (x>=obs[i]){
+      indicator<-indicator+1
+    }
+  }
+  return((n+1)^(-1)*indicator)
+}
+
+### Non-Parametric Pseudo Copula
+pseudo_copula_matrix<- copula_matrix<- matrix(0,ncol = 15,nrow = nrow(Data_log_return))
+for (i in 1:15){
+  for (j in 1:nrow(Data_log_return)){
+    pseudo_copula_matrix[j,i]<-edf(Data_log_return[j,i],Data_log_return[,i])
+  }
+}
+
+pairs(pseudo_copula_matrix[,1:5],main="Banking Portfolio")
+
+```
+
+## Application to Financial Data
+### Copula Estimation 
+
+- Substantial improvement in log-likelihood
+- Skewness parameter is warranted
+
+```{r,echo=FALSE,fig.height = 5, fig.width = 5, out.width = '50%', fig.align = "center"}
+## rho vector to Omega matrix ##
+rhoToOmega <- function(rho){
+  dim <- (sqrt(8*length(rho)+1)+1)/2;
+  Omega <- diag(1/2,dim);
+  Omega[lower.tri(Omega)] <- rho;
+  Omega <- Omega + t(Omega);
+  Omega;
+}
+
+## transforming original parameters to internal parameters ##
+GHEstIntPara <- function(rho,gamma,nu){
+  R <- rhoToOmega(rho);
+  LTR <- t(chol(R));
+  dim <- nrow(LTR);
+  theta <- acos(LTR[2:dim,1]);
+  cumsin <- sin(theta)[-1];
+  if(dim>2){
+    for(j in 2:(dim-1)){
+      thj <- acos(LTR[(j+1):dim,j]/cumsin);
+      theta <- c(theta,thj);
+      cumsin <- (cumsin*sin(thj))[-1];
+    }
+  }
+  c(theta,gamma,log(nu-2.0));
+}
+
+## transforming internal parameters to original parameters ##
+GHEstOrgPara <- function(para){
+  ntheta <- length(para)-2;
+  dim <- (1+sqrt(1+8*ntheta))/2;
+  theta <- para[1:ntheta];
+  LTR <- diag(dim);
+  LTR[-1,1] <- cos(theta[1:(dim-1)]);
+  cumsin <- sin(theta[1:(dim-1)]);
+  if(dim>2){
+    for(j in 2:(dim-1)){
+      LTR[j,j] <- cumsin[1];
+      k <- (j-1)*(dim-j/2)+1;
+      thj <- theta[k:(k+dim-j-1)];
+      cumsin <- cumsin[-1];
+      LTR[((j+1):dim),j] <- cumsin*cos(thj);
+      cumsin <- cumsin*sin(thj);
+    }
+  }
+  LTR[dim,dim] <- cumsin[1];
+  Omega <- LTR %*% t(LTR);
+  gamma <- para[ntheta+1];
+  nu <- exp(para[ntheta+2])+2.0;
+  list(rho = Omega[lower.tri(Omega)], gamma = gamma, nu = nu);
+}
+
+## negative log-likelihood for GH skew-t copula
+GHEstcopnll <- function(para, udat=NULL, mpoints=150){
+  dim <- ncol(udat);
+  dp <- GHEstOrgPara(para);
+  gamma <- dp$gamma;
+  nu <- dp$nu;
+  ix <- ipqsGHEst(udat,gamma,nu,mpoints=mpoints);
+  ## Activate the following line instead of monotone interpolating
+  quantile
+  ## function ipqsGHst() to use accurate quantile function aqsGHst()
+  ## ix <- aqsGHst(udat,gamma,nu);
+  ughyp <- ghyp(lambda=-nu/2, chi=nu, psi=0, sigma=1, gamma=gamma);
+  lm <- dghyp(as.vector(ix), ughyp, logvalue=TRUE);
+  mu <- rep(0,dim);
+  mgamma <- rep(gamma,length=dim);
+  mghyp <- ghyp(lambda=-nu/2, chi=nu, psi=0, mu=mu,
+                sigma=rhoToOmega(dp$rho), gamma=mgamma);
+  lc <- dghyp(matrix(ix,ncol=dim), mghyp, logvalue=TRUE);
+  -sum(lc)+sum(lm)
+}
+
+## MLE for GH skew-t copula using optim
+GHEstcop.mle <- function (udat = NULL, start = NULL, method = "Nelder-
+Mead", mpoints=150, ...){
+  iniPar <- GHEstIntPara(start$rho,start$gamma,start$nu);
+  fit <- optim(iniPar, GHEstcopnll, method=method, hessian=FALSE,
+               udat=udat, mpoints=mpoints, ...);
+  list(call = match.call(), dp = GHEstOrgPara(fit$par), logL = -fit$value,
+       details=fit, nobs = nrow(udat), method = method);
+}
+
+## interpolating quantiles for (equi-gamma) GH skew-t
+ipqsGHEst <- function(udat,gamma,nu,mpoints=150){
+  minmaxu <- c(min(udat),max(udat));
+  ughyp <- ghyp(lambda=-nu/2, chi=nu, psi=0, sigma=1, gamma=gamma);
+  minmaxx <- qghyp(minmaxu, ughyp, method = "splines");
+  xx <- seq(minmaxx[1],minmaxx[2],length.out=mpoints);
+  px <- sort(pghyp(xx, ughyp));
+  ix <- pchip(px, xx, as.vector(udat));
+  matrix(ix,nrow=nrow(udat),ncol=ncol(udat));
+}
+
+
+## t copula
+tIntTPara <- function(rho,nu){
+  R <- rhoToOmega(rho);
+  LTR <- t(chol(R));
+  ndim <- nrow(LTR);
+  theta <- acos(LTR[2:ndim,1]);
+  cumsin <- sin(theta)[-1];
+  if(ndim>=3){
+    for(j in 2:(ndim-1)){
+      thj <- acos(LTR[(j+1):ndim,j]/cumsin);
+      theta <- c(theta,thj);
+      cumsin <- (cumsin*sin(thj))[-1];
+    }
+  }
+  c(theta,log(nu-2.0));
+}
+
+tOrgTPara <- function(tpara){
+  ntpara <- length(tpara);
+  eta <- tpara[ntpara];
+  theta <- tpara[-ntpara];
+  ntheta <- length(theta);
+  ndim <- (1+sqrt(1+8*ntheta))/2;
+  LTR <- diag(ndim);
+  LTR[-1,1] <- cos(theta[1:(ndim-1)]);
+  cumsin <- sin(theta[1:(ndim-1)]);
+  if(ndim>=3){
+    for(j in 2:(ndim-1)){
+      LTR[j,j] <- cumsin[1];
+      k <- (j-1)*(ndim-j/2)+1;
+      thj <- theta[k:(k+ndim-j-1)];
+      cumsin <- cumsin[-1];
+      LTR[((j+1):ndim),j] <- cumsin*cos(thj);
+      cumsin <- cumsin*sin(thj);
+    }
+  }
+  LTR[ndim,ndim] <- cumsin[1];
+  Omega <- LTR %*% t(LTR);
+  nu <- exp(eta)+2.0;
+  list(rho = Omega[lower.tri(Omega)], nu = nu);
+}
+
+## t copula
+tIntTPara <- function(rho,nu){
+  R <- rhoToOmega(rho);
+  LTR <- t(chol(R));
+  ndim <- nrow(LTR);
+  theta <- acos(LTR[2:ndim,1]);
+  cumsin <- sin(theta)[-1];
+  if(ndim>=3){
+    for(j in 2:(ndim-1)){
+      thj <- acos(LTR[(j+1):ndim,j]/cumsin);
+      theta <- c(theta,thj);
+      cumsin <- (cumsin*sin(thj))[-1];
+    }
+  }
+  c(theta,log(nu-2.0));
+}
+
+## negative log-density for t copula
+tcopnll <- function(tpara, udat=NULL){
+  dp <- tOrgTPara(tpara);
+  Omega <- rhoToOmega(dp$rho);
+  nu <- dp$nu;
+  dim <- ncol(udat);
+  ax <- qt(udat, df=nu);
+  lm <- dt(ax, df=nu, log=TRUE);
+  lc <- dmt(matrix(ax,ncol=dim),S=Omega,df=nu,log=TRUE);
+  -sum(lc)+sum(lm)
+}
+
+empirical_copula<- pseudo_copula_matrix
+dim<- ncol(empirical_copula)
+
+iniTdp <- list(rho=numeric(dim*(dim-1)/2),nu=6);
+fit<-optim(tIntTPara(iniTdp$rho,iniTdp$nu), tcopnll,
+           udat=empirical_copula, control=list(reltol=1e-4))
+tdp <- tOrgTPara(fit$par);
+tcopmle <- list(inidp = iniTdp, dp = tdp, logL = -fit$value,
+                npara = length(fit$par), details=fit);
+
+
+
+iniSTdp1 <- list(rho=tdp$rho,gamma=0,nu=tdp$nu);
+iniSTPar <- GHEstIntPara(iniSTdp1$rho,iniSTdp1$gamma,iniSTdp1$nu);
+fit<-optim(iniSTPar, GHEstcopnll, udat=empirical_copula,control=list(reltol=1e-4))
+gstcopmle1 <- list(inidp = iniSTdp1, dp = GHEstOrgPara(fit$par), logL = -
+                     fit$value, npara = length(fit$par), details=fit)
+gstcopmle <- gstcopmle1
+
+iniSTdp2 <- list(rho=numeric(dim*(dim-1)/2),gamma=0,nu=6);
+iniSTPar <- GHEstIntPara(iniSTdp2$rho,iniSTdp2$gamma,iniSTdp2$nu);
+fit<-optim(iniSTPar, GHEstcopnll, udat=empirical_copula,control=list(reltol=1e-4))
+gstcopmle2 <- list(inidp = iniSTdp2, dp = GHEstOrgPara(fit$par), logL = -
+                     fit$value, npara = length(fit$par), details=fit);
+if(gstcopmle2$logL > gstcopmle$logL){ gstcopmle <- gstcopmle2; }
+
+#### Comparison
+log_lik<- c(tcopmle$logL,gstcopmle$logL)
+nu<- c(tcopmle$dp$nu,gstcopmle$dp$nu)
+gamma<- c(NA,gstcopmle$dp$gamma)
+AIC<- c(-2*tcopmle$logL+2*tcopmle$npara,-2*gstcopmle$logL+2*gstcopmle$npara)
+BIC<- c(-2*tcopmle$logL+log(nrow(Data_log_return))*tcopmle$npara,-2*gstcopmle$logL+log(nrow(Data_log_return))*gstcopmle$npara)
+results<- rbind(nu,gamma,log_lik,AIC,BIC)
+colnames(results)<- c("T-copula","Skew-T copula")
+kable(results)
+
+```
+
+## Application to Financial Data
+### Copula Estimation - copula
+
+```{r,fig.height = 6, fig.width = 8, out.width = '100%', fig.align = "center"}
+### GH skew-t
+#### random number generator of GH skew-t copula
+rGHEstcop <- function(n,rho,gamma,nu){
+  vv <- if(nu==Inf) 1 else rchisq(n,nu)/nu;
+  Omega <- rhoToOmega(rho);
+  d <- nrow(Omega);
+  z <- matrix(rnorm(n*d), n, d) %*% chol(Omega);
+  gammaMat <- t(matrix(gamma, d, n));
+  x <- gammaMat/vv + z/sqrt(vv);
+  ughyp <- ghyp(lambda=-nu/2, chi=nu, psi=0, sigma=1, gamma=gamma);
+  u <- matrix(pghyp(as.vector(x), ughyp),n,d);
+  list(x=x,u=u);
+}
+
+generated_u<-rGHEstcop(500,gstcopmle$dp$rho,gstcopmle$dp$gamma,gstcopmle$dp$nu)
+pairs(generated_u$u[,1:5],main="Banking Portfolio")
+
+```
+
+
+## Application to Financial Data
+### Copula Simulation - Aggregate Loss
+
+```{r,echo=FALSE,cache=TRUE}
+generated_rv<-rGHEstcop(100000,gstcopmle$dp$rho,gstcopmle$dp$gamma,gstcopmle$dp$nu)
+density(apply(scale(generated_rv$x),MARGIN = 1,mean)) %>% plot(xlim=c(-3,2),ylim=c(0,3),main="",lwd=2)
+
+density(apply(scale(Data_log_return),MARGIN = 1,mean)) %>% lines(col="deepskyblue", lwd=2)
+
+legend("topleft", c("actual", "estimated"), lty = 1, lwd = 2, col = c("deepskyblue", "black"))
+```
+
+## Application to Financial Data
+### In-sample Testing for Aggregate Weekly Loss
+
+```{r,echo=FALSE,cache=TRUE}
+quantile<- sort(apply(scale(generated_rv$x),MARGIN = 1,mean))[c(1000,5000,10000,15000)]
+empirical_1<- sum(apply(scale(Data_log_return),MARGIN = 1,mean) < quantile[1])/ nrow(Data_log_return)
+empirical_2<- sum(apply(scale(Data_log_return),MARGIN = 1,mean) < quantile[2])/ nrow(Data_log_return)
+empirical_3<- sum(apply(scale(Data_log_return),MARGIN = 1,mean) < quantile[3])/ nrow(Data_log_return)
+empirical_4<- sum(apply(scale(Data_log_return),MARGIN = 1,mean) < quantile[4])/ nrow(Data_log_return)
+VaR<- c("99%","95%","90%","85%")
+empirical<- c(empirical_1,empirical_2,empirical_3,empirical_4)
+results<-rbind(round(quantile,2),round(empirical,2))
+colnames(results)<- c("99%","95%","90%","85%")
+rownames(results)<-c("% VaR","Empirical Violation Percentage")
+kable(results)
+```
+
+## Application to Financial Data
+### One Stage EM Estimation
+
+```{r}
+mkPseudoDat <- function(orgdat){
+  dim <- ncol(orgdat);
+  N <- nrow(orgdat);
+  u <- x <- matrix(0,nrow=N,ncol=dim);
+  for(j in 1:dim){
+    x[,j] <- orgdat[,j];
+    Fx <- ecdf(x[,j]);
+    u[,j] <- Fx(x[,j])*N/(N+1);
+  }
+  list(x=x,u=u);
+}
+fitted_2<- fit.tmv(Data_log_return,silent=T)
+simulation_3<- rghyp(500,object = fitted_2)
+pairs(mkPseudoDat(simulation_3)$u[,1:5])
+```
+
+
+## Application to Financial Data
+### One Stage EM Estimation
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE,cache=TRUE}
+### Multivariate skew-T
+fitted_2<- fit.tmv(Data_log_return,silent=T)
+simulation_2<- rghyp(100000,object = fitted_2)
+
+density(apply(simulation_2,MARGIN = 1,mean)) %>% plot(ylim=c(0,20),main="",lwd=2)
+
+density(apply(Data_log_return,MARGIN = 1,mean)) %>% lines(col="deepskyblue",lwd=2)
+
+legend("topleft", c("actual", "estimated"), lty = 1, lwd = 2, col = c("deepskyblue", "black"))
+
+```
+
+## Application to Financial Data
+### In-sample Testing for Aggregate Weekly Loss
+
+```{r,echo=FALSE}
+quantile<- sort(apply(simulation_2,MARGIN = 1,mean))[c(1000,5000,10000,15000)]
+empirical_1<- sum(apply(Data_log_return,MARGIN = 1,mean) < quantile[1])/ nrow(Data_log_return)
+empirical_2<- sum(apply(Data_log_return,MARGIN = 1,mean) < quantile[2])/ nrow(Data_log_return)
+empirical_3<- sum(apply(Data_log_return,MARGIN = 1,mean) < quantile[3])/ nrow(Data_log_return)
+empirical_4<- sum(apply(Data_log_return,MARGIN = 1,mean) < quantile[4])/ nrow(Data_log_return)
+empirical<- c(empirical_1,empirical_2,empirical_3,empirical_4)
+results<-rbind(round(quantile,2),round(empirical,2))
+rownames(results)<-c("% VaR","Empirical Violation Percentage")
+colnames(results)<- c("99%","95%","90%","85%")
+kable(results)
+```
+
+## Possible Improvement
+  - Omission of skewness information on pseudo copula
+  - $\nu$ is close to boundary - group-T copula construction
+  - Semi-parametric estimation on the marginals
+  - Dynamic P&L and VaR modeling through t-Garch models
+  - More comprehensive backtesting methods - Risk Map
+
+## Reference
+- McNeil, A. J., R. Frey, and P. Embrechts (2015) Quantitative Risk Management: Concepts, Techniques, and Tools, Princeton University Press, revised ed
+- Demarta, S. and A. J. McNeil (2005) “The t copula and related copulas,” International Statistical Review, 73(1), 111–129.
+- Toshinao Yoshiba Maximum likelihood estimation of skew- t copulas with its applications to stock returns May 2018 Journal of Statistical Computation and Simulation 88(2):1-18
+- Colletaz, G., Hurlin, C. and Perignon, C. (2013). The risk map: A new tool for validating risk models. Journal of Banking and Finance, 37, 3843-3854
+
+
+
+
+
+
